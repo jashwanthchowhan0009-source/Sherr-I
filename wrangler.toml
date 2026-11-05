@@ -19,7 +19,7 @@ WHATSAPP_TEMPLATE_NAME = "sherr_update"
 WHATSAPP_TEMPLATE_LANG = "en"
 GEMINI_MODEL = "gemini-2.5-flash"
 ALLOWED_NUMBERS = ""        # e.g. "919876543210,919988776655" while testing
-SHERR_DISPLAY_NUMBER = ""   # your WhatsApp test number, shown to users
+SHERR_DISPLAY_NUMBER = "+1 555 195 2244"   # WhatsApp test number, shown to users
 
 [observability]
 enabled = true
