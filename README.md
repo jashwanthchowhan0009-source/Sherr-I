@@ -17,70 +17,59 @@
 - 👨‍👩‍👧 Family mode: *"Papa ko roz 9 baje BP tablet yaad dilana"* → Sherr I Papa ko unki bhasha mein WhatsApp karta hai
 - ✅ Papa reply karein → tujhe update. 30 min tak reply nahi → tujhe nudge
 - 🎙️ Voice notes samajhta hai (Telugu / Hindi / English / mix)
-- 🔒 Privacy: RLS on, sirf server access; chat history 30 din baad auto-delete; Meta signature verified webhook
+- 🔒 Privacy: sirf Meta ke signed webhooks accept, chat history 30 din baad auto-delete
 
-## Stack (sab free tier)
+## Stack (100% free)
 
-| Part | Kya | Cost |
+| Part | Kya | Free tier |
 |---|---|---|
 | Channel | WhatsApp Cloud API (Meta, direct) | Test number free |
-| Backend | Supabase Edge Functions | Free |
-| Database | Supabase Postgres (RLS on) | Free |
-| Scheduler | pg_cron (har minute) | Free |
-| AI | Gemini (`gemini-2.5-flash`) | Free tier |
+| Server | Cloudflare Workers | 100k requests/din |
+| Database | Cloudflare D1 (SQLite) | 5 GB |
+| Scheduler | Cron Triggers (har minute) | Free, kabhi pause nahi hota |
+| AI | Gemini `gemini-2.5-flash` | Free tier |
 
 ```
-WhatsApp ──► whatsapp-webhook (Edge Function) ──► Gemini (tools) ──► Postgres
-                      ▲                                                  │
-pg_cron (1 min) ──► send-reminders (Edge Function) ──► WhatsApp ◄────────┘
+WhatsApp ──► /webhook ──► Gemini (tools) ──► D1
+                ▲                              │
+  cron (1 min) ─┴─► reminders ──► WhatsApp ◄───┘
 ```
 
-## Setup (≈30 min)
+## Setup (~20 min)
 
-### 1. Supabase
-1. [supabase.com](https://supabase.com) pe naya project bana (region: Mumbai).
-2. Supabase CLI install kar aur link kar:
-   ```bash
-   npm i -g supabase
-   supabase login
-   supabase link --project-ref YOUR-PROJECT-REF
-   supabase db push          # tables bana dega
-   ```
+### 1. Keys le aa
 
-### 2. Meta / WhatsApp
-1. [developers.facebook.com](https://developers.facebook.com) → **Create App** → type **Business** → **WhatsApp** add kar.
-2. **WhatsApp → API Setup** se copy kar: **Phone number ID** aur **temporary access token**
-   (baad mein System User se permanent token bana lena).
-3. Test number se apna number **"To"** list mein add kar (max 5 numbers). Papa ka bhi add kar.
-   Profile photo ke liye `assets/logo-dark.jpg` lagao (WhatsApp Manager → Phone numbers → Profile).
-4. **App settings → Basic** se **App Secret** copy kar.
-5. **Message template** bana (WhatsApp Manager → Templates): name `sherr_update`, category **Utility**,
-   language **English**, body: `Sherr I update: {{1}}`. Yeh 24h window ke baad reminders bhejne ke liye zaroori hai.
+**Meta / WhatsApp** ([developers.facebook.com](https://developers.facebook.com)):
+1. **Create App** → type **Business** → **WhatsApp** add kar
+2. **WhatsApp → API Setup** se copy kar: **Phone number ID** + **Access token**
+3. Wahi page pe **"To"** mein apna aur Papa ka number add kar (test number max 5 numbers ko bhej sakta hai)
+4. **App settings → Basic** se **App Secret** copy kar
+5. **Template** bana (WhatsApp Manager → Message templates): name `sherr_update`, category **Utility**,
+   language **English**, body `Sherr I update: {{1}}`. 24 ghante baad reminders bhejne ke liye zaroori hai.
+6. Profile photo: `assets/logo-dark.jpg`
 
-### 3. Gemini key
-[aistudio.google.com](https://aistudio.google.com/apikey) se free API key le.
+**Gemini:** [aistudio.google.com/apikey](https://aistudio.google.com/apikey) se free key.
 
-> ⚠️ Gemini free tier ka data Google product improve karne mein use kar sakta hai.
-> Testing ke liye theek hai. **Real users se pehle paid key use kar** (ya Claude API pe switch kar, `_shared/gemini.ts` badlo).
+> ⚠️ Gemini free tier ka data Google training mein use kar sakta hai. Testing ke liye theek.
+> **Real users se pehle paid key** (ya Claude API; sirf `src/gemini.ts` badlo).
 
-### 4. Secrets + deploy
+### 2. Ek command se deploy
+Free [Cloudflare account](https://dash.cloudflare.com/sign-up) bana, phir:
 ```bash
-cp .env.example .env      # values bhar
-supabase secrets set --env-file .env
-supabase functions deploy whatsapp-webhook
-supabase functions deploy send-reminders
+git clone https://github.com/jashwanthchowhan0009-source/Sherr-I.git
+cd Sherr-I
+npm install
+npm run setup
 ```
+Script khud: login karayega → database banayega → tables → deploy → keys poochega →
+end mein **Webhook URL + Verify token** dikhayega.
 
-### 5. Webhook connect kar
-Meta → **WhatsApp → Configuration → Webhook**:
-- Callback URL: `https://YOUR-PROJECT-REF.supabase.co/functions/v1/whatsapp-webhook`
-- Verify token: jo `WHATSAPP_VERIFY_TOKEN` mein daala
-- Subscribe: **messages**
+### 3. Webhook connect kar
+Meta → **WhatsApp → Configuration → Webhook → Edit**:
+- Callback URL + Verify token: setup script ne jo diya
+- **Manage** → `messages` subscribe kar
 
-### 6. Reminders ka cron
-Supabase **SQL Editor** mein `supabase/sql/cron.sql` khol, 2 placeholder values bhar, run kar.
-
-### 7. Try kar 🔥
+### 4. Try kar 🔥
 Test number pe WhatsApp kar:
 1. `Hi`
 2. `Papa ka number 98xxxxxxxx hai, unse Telugu mein baat karna`
@@ -89,33 +78,35 @@ Test number pe WhatsApp kar:
 
 ## Dev
 ```bash
-deno task test    # unit tests
-deno task check   # type check
+npm test          # unit tests
+npm run test:e2e  # full flow locally (mock WhatsApp + Gemini, real Worker + D1)
+npm run check     # type check
+npm run logs      # live logs from Cloudflare
 ```
 
-Logs: Supabase Dashboard → Edge Functions → Logs.
+Settings (template name, model, allowed numbers) → `wrangler.toml` ke `[vars]` mein, phir `npm run deploy`.
 
 ## Files
 ```
-supabase/
-  migrations/…_init.sql      tables + RLS
-  sql/cron.sql               pg_cron jobs (run once)
-  functions/
-    whatsapp-webhook/        incoming messages, family opt-in, replies
-    send-reminders/          due reminders + 30-min nudges
-    _shared/
-      brain.ts               system prompt + tools (yahan naye features add karo)
-      gemini.ts              AI client (swap to Claude here)
-      whatsapp.ts            send text/template, download voice notes
-      util.ts                pure helpers (tested)
-      i18n.ts                fixed lines in Telugu/Hindi/…
-tests/                       deno tests
+src/
+  index.ts       entry: /webhook + cron
+  webhook.ts     incoming messages, family opt-in, reply → owner update
+  reminders.ts   due reminders, 30-min nudges, 30-day cleanup
+  brain.ts       system prompt + tools (naye features yahan)
+  gemini.ts      AI client (Claude pe switch yahan)
+  whatsapp.ts    send text/template, voice note download
+  db.ts          D1 queries
+  util.ts        pure helpers (tested)
+  i18n.ts        Telugu/Hindi/... fixed lines
+migrations/      D1 tables
+scripts/setup.sh one-time setup
+tests/           unit + end-to-end
 ```
 
 ## Limits (MVP)
 - Sirf IST time zone.
-- Test number sirf 5 verified numbers ko message kar sakta hai. Public launch ke liye Meta Business verification + apna number.
-- DPDP Act: launch se pehle privacy policy + consent flow add karna (CA/lawyer se check karwa lena).
+- Test number sirf 5 verified numbers. Public launch ke liye Meta Business verification + apna number.
+- DPDP Act: launch se pehle privacy policy + consent flow (CA/lawyer se check karwa lena).
 
 ## Next ideas
 - Google Calendar / Gmail tools

@@ -3,7 +3,7 @@
 type Lang = "telugu" | "hindi" | "english" | "tamil" | "kannada" | "malayalam" | "hinglish";
 
 const THANKS: Record<Lang, string> = {
-  telugu: "Sare andi, thank you! 🙏 Meeku cheppanu.",
+  telugu: "Sare andi, thank you! 🙏 Vaallaki cheppesanu.",
   hindi: "धन्यवाद! 🙏 मैंने बता दिया है।",
   english: "Thank you! 🙏 I've let them know.",
   tamil: "நன்றி! 🙏 அவர்களுக்கு தெரிவித்துவிட்டேன்.",

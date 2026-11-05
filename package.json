@@ -1,0 +1,21 @@
+{
+  "name": "sherr-i",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply sherr-i --remote",
+    "logs": "wrangler tail",
+    "check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --no-warnings --test tests/unit.test.ts",
+    "test:e2e": "node --experimental-strip-types --no-warnings tests/e2e.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261104.1",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.0.0"
+  }
+}
