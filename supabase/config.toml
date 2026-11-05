@@ -1,0 +1,9 @@
+project_id = "sherr-i"
+
+# Meta calls the webhook without a Supabase JWT; we verify Meta's signature ourselves.
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+# pg_cron calls this with our own x-cron-secret header.
+[functions.send-reminders]
+verify_jwt = false
