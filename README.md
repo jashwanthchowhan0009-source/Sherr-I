@@ -1,7 +1,16 @@
-# Sherr I 🐯
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.jpg">
+    <img src="assets/logo-light.png" alt="Sherr I logo" width="180">
+  </picture>
+</p>
 
-WhatsApp pe chalne wala personal + family assistant, by **SherrByte**.
-Bolo (text ya voice note), aur kaam ho jaaye.
+<h1 align="center">Sherr I</h1>
+
+<p align="center">
+  WhatsApp pe chalne wala personal + family assistant, by <b>SherrByte</b>.<br>
+  Bolo (text ya voice note), aur kaam ho jaaye.
+</p>
 
 **Abhi kya kar sakta hai (MVP):**
 - ⏰ Reminders: one-time ya daily (*"Kal 7 baje gym yaad dilana"*)
@@ -43,6 +52,7 @@ pg_cron (1 min) ──► send-reminders (Edge Function) ──► WhatsApp ◄�
 2. **WhatsApp → API Setup** se copy kar: **Phone number ID** aur **temporary access token**
    (baad mein System User se permanent token bana lena).
 3. Test number se apna number **"To"** list mein add kar (max 5 numbers). Papa ka bhi add kar.
+   Profile photo ke liye `assets/logo-dark.jpg` lagao (WhatsApp Manager → Phone numbers → Profile).
 4. **App settings → Basic** se **App Secret** copy kar.
 5. **Message template** bana (WhatsApp Manager → Templates): name `sherr_update`, category **Utility**,
    language **English**, body: `Sherr I update: {{1}}`. Yeh 24h window ke baad reminders bhejne ke liye zaroori hai.
