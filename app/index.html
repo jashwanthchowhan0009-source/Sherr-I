@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Sherr I</title>
 <meta name="description" content="Sherr I — text it, it gets things done. By SherrByte.">
-<meta name="theme-color" content="#0c0b0a">
+<meta name="theme-color" content="#ffffff" id="themeColor">
+<script>/* apply saved theme before paint */try{var t=JSON.parse(localStorage.getItem("sherr:theme")||"\"system\"");if(t!=="system")document.documentElement.dataset.theme=t;var d=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.resolved=d?"dark":"light";}catch(e){}</script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -32,32 +33,27 @@
         </g>
         <rect class="reveal-all" width="360" height="400" fill="#fff"/>
       </mask>
-      <radialGradient id="glow"><stop offset="0" stop-color="#ffb867" stop-opacity=".95"/><stop offset="1" stop-color="#f0912f" stop-opacity="0"/></radialGradient>
     </defs>
-    <image href="/img/tiger.jpg" x="0" y="0" width="360" height="360" mask="url(#claws)" class="tiger"/>
-    <circle cx="192" cy="166" r="34" fill="url(#glow)" class="eye-glow"/>
+    <image href="/img/tiger.png" x="0" y="0" width="360" height="360" mask="url(#claws)" class="logo"/>
     <text x="180" y="392" text-anchor="middle" class="splash-title">Sherr I</text>
   </svg>
-  <p class="splash-tag">Bas bolo. Ho jaayega.</p>
+  <p class="splash-tag">Text it. It gets done.</p>
 </div>
 
 <div class="app" id="app">
   <header class="top">
     <button class="brand" id="brandBtn" aria-label="Sherr I home">
-      <img src="/img/tiger.jpg" alt="" class="brand-eye">
+      <img src="/img/tiger.png" alt="" class="logo">
       <span class="brand-name">Sherr I</span>
     </button>
-    <button class="pill" id="powersBtn" aria-haspopup="dialog">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="currentColor"/></svg>
-      <span>Powers</span><b id="powerCount">0</b>
-    </button>
+    <button class="text-btn" id="powersBtn" aria-haspopup="dialog">Powers · <span id="powerCount">0</span></button>
   </header>
 
   <main class="feed" id="feed" aria-live="polite">
     <section class="welcome" id="welcome">
-      <h1 class="hand" id="hello">Namaste!</h1>
-      <p>Text me what you need. I'll message people, find trains and hotels, make images and remind you.</p>
-      <div class="chips" id="chips"></div>
+      <h1 id="hello">Text Sherr I.<br>It gets done.</h1>
+      <p>No new apps to learn. Tell it what you need, like you'd text a friend.</p>
+      <div class="tasks" id="tasks"></div>
     </section>
   </main>
 
@@ -76,10 +72,15 @@
 <div class="sheet" id="powers" role="dialog" aria-modal="true" aria-labelledby="powersTitle" hidden>
   <div class="sheet-card">
     <div class="sheet-head">
-      <h2 class="hand" id="powersTitle">Powers</h2>
+      <h2 id="powersTitle">Powers</h2>
       <button class="icon-btn" data-close aria-label="Close">✕</button>
     </div>
     <p class="muted">Switch on what Sherr I can do for you. Anything that sends, calls or pays always waits for your tap.</p>
+    <div class="group"><h4>Look</h4>
+      <div class="seg" id="themeSeg" role="group" aria-label="Theme">
+        <button type="button" data-theme-opt="system">System</button><button type="button" data-theme-opt="light">Light</button><button type="button" data-theme-opt="dark">Dark</button>
+      </div>
+    </div>
     <div id="powerList"></div>
     <div class="sheet-foot">
       <button class="link-btn" id="editProfile">Edit name and language</button>
@@ -91,7 +92,7 @@
 <!-- First run -->
 <div class="sheet" id="onboard" role="dialog" aria-modal="true" aria-labelledby="obTitle" hidden>
   <div class="sheet-card">
-    <h2 class="hand" id="obTitle">Hey, I'm Sherr I</h2>
+    <h2 id="obTitle">Hey, I'm Sherr I</h2>
     <p class="muted">Two things and we're set.</p>
     <form id="obForm" class="ob-form">
       <label for="obName">What should I call you?</label>

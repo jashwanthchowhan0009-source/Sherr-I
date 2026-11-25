@@ -1,6 +1,6 @@
 // Sherr I service worker: app shell offline, network-first so updates show at once.
-const CACHE = "sherr-i-v1";
-const SHELL = ["/", "/index.html", "/styles.css", "/app.js", "/img/tiger.jpg", "/icons/icon-192.png", "/manifest.webmanifest"];
+const CACHE = "sherr-i-v2";
+const SHELL = ["/", "/index.html", "/styles.css", "/app.js", "/img/tiger.png", "/icons/icon-192.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
