@@ -35,8 +35,8 @@ function env(...names) {
   }
   return "";
 }
-export const geminiKey = () => env("GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GEMINI_KEY");
-export const groqKey = () => env("GROQ_API_KEY", "GROQ_KEY");
+export const geminiKey = () => env("GEMINI_API_KEY", "GEMINI_API_FOR_SHERR_I", "GEMINI_FOR_SHERR_I", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GEMINI_KEY");
+export const groqKey = () => env("GROQ_API_KEY", "GROQ_FOR_SHERR_I", "GROQ_API_FOR_SHERR_I", "GROQ_KEY");
 
 // Once the gateway says "no card", stop wasting a round-trip on it for a while.
 let gatewayDownUntil = 0;
