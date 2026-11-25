@@ -27,15 +27,31 @@ export class LLMError extends Error {}
 const GROQ = "https://api.groq.com/openai/v1/chat/completions";
 
 /** Free providers tried in order after the gateway (each only if its key is set). */
+/** First non-empty env var among names (trimmed; tolerates stray quotes/spaces from the dashboard). */
+function env(...names) {
+  for (const n of names) {
+    const v = (process.env[n] || "").trim().replace(/^["']|["']$/g, "");
+    if (v) return v;
+  }
+  return "";
+}
+export const geminiKey = () => env("GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GEMINI_KEY");
+export const groqKey = () => env("GROQ_API_KEY", "GROQ_KEY");
+
+// Once the gateway says "no card", stop wasting a round-trip on it for a while.
+let gatewayDownUntil = 0;
+export const gatewayDown = () => Date.now() < gatewayDownUntil;
+
 function freeLanes() {
   const lanes = [];
-  if (process.env.GEMINI_API_KEY) {
+  const gk = geminiKey(), qk = groqKey();
+  if (gk) {
     const models = (process.env.SHERR_FALLBACK_MODEL || "gemini-3.8-flash,gemini-2.5-flash").split(",").map((m) => m.trim());
-    for (const m of models) lanes.push({ url: GEMINI, key: process.env.GEMINI_API_KEY, model: m, label: `google/${m}` });
+    for (const m of models) lanes.push({ url: GEMINI, key: gk, model: m, label: `google/${m}` });
   }
-  if (process.env.GROQ_API_KEY) {
+  if (qk) {
     const m = process.env.SHERR_GROQ_MODEL || "openai/gpt-oss-120b";
-    lanes.push({ url: GROQ, key: process.env.GROQ_API_KEY, model: m, label: `groq/${m}` });
+    lanes.push({ url: GROQ, key: qk, model: m, label: `groq/${m}` });
   }
   return lanes;
 }
@@ -43,13 +59,15 @@ function freeLanes() {
 export async function chat(opts) {
   const { gatewayToken } = opts;
   const lanes = opts.extra?.modalities ? [] : freeLanes(); // images need the gateway
-  if (!gatewayToken && !lanes.length) throw new LLMError("No AI access configured (AI Gateway, GEMINI_API_KEY or GROQ_API_KEY).");
+  const useGateway = gatewayToken && !(lanes.length && gatewayDown());
+  if (!useGateway && !lanes.length) throw new LLMError("No AI access configured (AI Gateway, GEMINI_API_KEY or GROQ_API_KEY).");
   let lastErr;
-  if (gatewayToken) {
+  if (useGateway) {
     try {
       return { ...(await call(GATEWAY, gatewayToken, opts)), servedBy: opts.model };
     } catch (e) {
       lastErr = e;
+      if (/credit card|40[13]/.test(e.message)) gatewayDownUntil = Date.now() + 15 * 60_000;
       if (!lanes.length) throw e;
       console.warn("gateway failed, using free lanes:", e.message);
     }

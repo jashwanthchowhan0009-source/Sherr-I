@@ -1,5 +1,6 @@
 // POST /api/chat — the only server endpoint. Keys never reach the phone.
 import { respond } from "../lib/agent.js";
+import { geminiKey, groqKey } from "../lib/llm.js";
 
 const hits = new Map(); // best-effort per-instance rate limit
 const LIMIT = 40;
@@ -50,5 +51,7 @@ export async function POST(request) {
 }
 
 export function GET() {
-  return json({ ok: true, name: "Sherr I", invite: !!process.env.SHERR_INVITE_CODES });
+  // Booleans only: shows which AI lanes this deployment can see, never the keys.
+  const ai = { gateway: !!(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN), gemini: !!geminiKey(), groq: !!groqKey() };
+  return json({ ok: true, name: "Sherr I", invite: !!process.env.SHERR_INVITE_CODES, ai });
 }
