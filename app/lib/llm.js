@@ -24,21 +24,46 @@ export class LLMError extends Error {}
  * @param {object} [o.extra] extra body fields (e.g. modalities)
  * @param {Function} [o.fetchImpl]
  */
+const GROQ = "https://api.groq.com/openai/v1/chat/completions";
+
+/** Free providers tried in order after the gateway (each only if its key is set). */
+function freeLanes() {
+  const lanes = [];
+  if (process.env.GEMINI_API_KEY) {
+    const models = (process.env.SHERR_FALLBACK_MODEL || "gemini-3.8-flash,gemini-2.5-flash").split(",").map((m) => m.trim());
+    for (const m of models) lanes.push({ url: GEMINI, key: process.env.GEMINI_API_KEY, model: m, label: `google/${m}` });
+  }
+  if (process.env.GROQ_API_KEY) {
+    const m = process.env.SHERR_GROQ_MODEL || "openai/gpt-oss-120b";
+    lanes.push({ url: GROQ, key: process.env.GROQ_API_KEY, model: m, label: `groq/${m}` });
+  }
+  return lanes;
+}
+
 export async function chat(opts) {
   const { gatewayToken } = opts;
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!gatewayToken && !geminiKey) throw new LLMError("No AI access configured (AI Gateway or GEMINI_API_KEY).");
+  const lanes = opts.extra?.modalities ? [] : freeLanes(); // images need the gateway
+  if (!gatewayToken && !lanes.length) throw new LLMError("No AI access configured (AI Gateway, GEMINI_API_KEY or GROQ_API_KEY).");
+  let lastErr;
   if (gatewayToken) {
     try {
       return { ...(await call(GATEWAY, gatewayToken, opts)), servedBy: opts.model };
     } catch (e) {
-      // No gateway credits / model blocked: fall back to free Gemini if a key is set
-      if (!geminiKey || opts.extra?.modalities) throw e;
-      console.warn("gateway failed, falling back to Gemini:", e.message);
+      lastErr = e;
+      if (!lanes.length) throw e;
+      console.warn("gateway failed, using free lanes:", e.message);
     }
   }
-  const model = process.env.SHERR_FALLBACK_MODEL || "gemini-2.5-flash";
-  return { ...(await call(GEMINI, geminiKey, { ...opts, model })), servedBy: `google/${model}` };
+  // Free lanes: on rate limit / unknown model, move to the next one
+  for (const lane of lanes) {
+    try {
+      return { ...(await call(lane.url, lane.key, { ...opts, model: lane.model })), servedBy: lane.label };
+    } catch (e) {
+      lastErr = e;
+      console.warn(`lane ${lane.label} failed:`, e.message);
+    }
+  }
+  throw lastErr;
 }
 
 async function call(url, token, { model, messages, tools, extra = {}, fetchImpl = fetch, maxTokens = 900 }) {

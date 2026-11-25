@@ -79,3 +79,19 @@ test("ask_model routes to the named model", async () => {
   assert.match(calls[0].model, /^anthropic\//);
   assert.equal(r.action.model, "Claude");
 });
+
+test("free lanes: Gemini model missing -> next Gemini model -> Groq", async () => {
+  process.env.GEMINI_API_KEY = "g"; process.env.GROQ_API_KEY = "q";
+  const { chat } = await import("../lib/llm.js");
+  const seen = [];
+  const fetchImpl = async (url, init) => {
+    const body = JSON.parse(init.body); seen.push(`${new URL(url).host}:${body.model}`);
+    if (seen.length < 3) return new Response(JSON.stringify({ error: { message: "not found" } }), { status: 404 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: "hi" } }] }), { status: 200 });
+  };
+  const out = await chat({ model: "anthropic/claude-haiku-5.5", messages: [{ role: "user", content: "hi" }], fetchImpl });
+  assert.equal(out.content, "hi");
+  assert.match(out.servedBy, /^groq\//);
+  assert.deepEqual(seen.map((s) => s.split(":")[0]), ["generativelanguage.googleapis.com", "generativelanguage.googleapis.com", "api.groq.com"]);
+  delete process.env.GEMINI_API_KEY; delete process.env.GROQ_API_KEY;
+});
