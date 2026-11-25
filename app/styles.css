@@ -98,7 +98,8 @@ button{cursor:pointer}
 
 /* ---------- composer */
 .composer{display:flex;align-items:flex-end;gap:8px;padding:10px max(14px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
-.composer textarea{flex:1;min-width:0;resize:none;max-height:140px;background:var(--soft);border:1px solid transparent;border-radius:22px;padding:11px 16px;line-height:1.35;outline:none}
+.composer textarea{flex:1;min-width:0;resize:none;max-height:140px;overflow-y:auto;scrollbar-width:none;background:var(--soft);border:1px solid transparent;border-radius:22px;padding:11px 16px;line-height:1.35;outline:none}
+.composer textarea::-webkit-scrollbar{display:none}
 .composer textarea:focus{border-color:var(--line)}
 .icon-btn{width:44px;height:44px;flex:0 0 auto;border-radius:50%;border:0;background:var(--soft);color:var(--ink);display:grid;place-items:center;padding:0}
 .icon-btn svg{width:20px;height:20px}

@@ -41,7 +41,11 @@ export async function POST(request) {
     return json(out);
   } catch (e) {
     console.error("sherr-i chat failed", e);
-    return json({ reply: "Abhi network mein dikkat hai, ek baar phir bhejo 🙏", actions: [], error: "upstream" }, 502);
+    const setup = /credit card|No AI access|401|403/.test(String(e?.message));
+    const reply = setup
+      ? "Sherr I ka AI abhi connect nahi hai (setup pending). Thodi der mein phir try karo 🙏"
+      : "Abhi network mein dikkat hai, ek baar phir bhejo 🙏";
+    return json({ reply, actions: [], error: setup ? "ai_setup" : "upstream" }, 502);
   }
 }
 
