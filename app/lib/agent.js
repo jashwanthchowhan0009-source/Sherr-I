@@ -161,7 +161,9 @@ export async function runTool(name, args, ctx) {
           { role: "user", content: String(args.question).slice(0, 4000) },
         ],
       });
-      const label = { claude: "Claude", gpt: "GPT", gemini: "Gemini" }[args.model] || "AI";
+      const asked = { claude: "Claude", gpt: "GPT", gemini: "Gemini" }[args.model] || "AI";
+      // Be honest when a fallback model answered instead of the one asked for
+      const label = out.servedBy === model ? asked : `Gemini (${asked} unavailable)`;
       return { result: { ok: true, answer: out.content.slice(0, 1500) }, action: { type: "answer", model: label, text: out.content } };
     }
     case "create_image": {

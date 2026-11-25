@@ -24,21 +24,26 @@ export class LLMError extends Error {}
  * @param {object} [o.extra] extra body fields (e.g. modalities)
  * @param {Function} [o.fetchImpl]
  */
-export async function chat({ model, messages, tools, gatewayToken, extra = {}, fetchImpl = fetch, maxTokens = 900 }) {
+export async function chat(opts) {
+  const { gatewayToken } = opts;
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!gatewayToken && !geminiKey) throw new LLMError("No AI access configured (AI Gateway or GEMINI_API_KEY).");
+  if (gatewayToken) {
+    try {
+      return { ...(await call(GATEWAY, gatewayToken, opts)), servedBy: opts.model };
+    } catch (e) {
+      // No gateway credits / model blocked: fall back to free Gemini if a key is set
+      if (!geminiKey || opts.extra?.modalities) throw e;
+      console.warn("gateway failed, falling back to Gemini:", e.message);
+    }
+  }
+  const model = process.env.SHERR_FALLBACK_MODEL || "gemini-2.5-flash";
+  return { ...(await call(GEMINI, geminiKey, { ...opts, model })), servedBy: `google/${model}` };
+}
+
+async function call(url, token, { model, messages, tools, extra = {}, fetchImpl = fetch, maxTokens = 900 }) {
   const body = { model, messages, max_tokens: maxTokens, ...extra };
   if (tools?.length) body.tools = tools;
-
-  let url = GATEWAY;
-  let token = gatewayToken;
-  if (!token && process.env.GEMINI_API_KEY) {
-    // Free fallback: every request goes to Gemini directly
-    url = GEMINI;
-    token = process.env.GEMINI_API_KEY;
-    body.model = process.env.SHERR_FALLBACK_MODEL || "gemini-2.5-flash";
-    delete body.modalities;
-  }
-  if (!token) throw new LLMError("No AI access configured (AI Gateway or GEMINI_API_KEY).");
-
   const res = await fetchImpl(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
