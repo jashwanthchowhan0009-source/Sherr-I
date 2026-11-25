@@ -12,6 +12,21 @@
   Bolo (text ya voice note), aur kaam ho jaaye.
 </p>
 
+## 📱 Sherr I App (new — `app/`)
+
+Instinct jaisa text-first assistant, ab **app** ke roop mein (installable PWA). Text karo, Sherr I kaam ready karta hai:
+WhatsApp/SMS/call (tum tap karke bhejte ho), trains (ConfirmTkt/ixigo, IRCTC), flights (MakeMyTrip), hotels, buses (redBus),
+reminders, Claude/GPT/Gemini se poochna, images banana, Higgsfield video prompts, shopping apps.
+
+- Deploy: Vercel → Import this repo → **Root Directory: `app`** → Deploy. AI Vercel AI Gateway se chalta hai (no keys in code).
+  Optional free fallback: env `GEMINI_API_KEY`. Invite-only launch: env `SHERR_INVITE_CODES=TIGER-001,TIGER-002`.
+- Local: `cd app && GEMINI_API_KEY=... node dev-server.mjs` → http://127.0.0.1:3000
+- Tests: `cd app && npm test`
+
+---
+
+## WhatsApp bot (Cloudflare Worker)
+
 **Abhi kya kar sakta hai (MVP):**
 - ⏰ Reminders: one-time ya daily (*"Kal 7 baje gym yaad dilana"*)
 - 👨‍👩‍👧 Family mode: *"Papa ko roz 9 baje BP tablet yaad dilana"* → Sherr I Papa ko unki bhasha mein WhatsApp karta hai
