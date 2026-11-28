@@ -16,8 +16,14 @@ function limited(ip) {
 const str = (v, n) => String(v ?? "").slice(0, n);
 const id = (v) => str(v, 64).replace(/[^\w-]/g, "") || Math.random().toString(36).slice(2, 10);
 
-export function GET() {
+export async function GET(request) {
   const keys = vapidKeys();
+  // TEMP self-test: queue a job to a dummy endpoint 30s out, to prove delivery timing end to end.
+  if (keys && new URL(request.url).searchParams.get("selftest") === "q1") {
+    const at = new Date(Date.now() + 30_000).toISOString();
+    await enqueue({ kind: "remind", id: "selftest", sub: { endpoint: "https://fcm.googleapis.com/fcm/send/sherr-selftest", keys: { p256dh: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM", auth: "tBHItJI5svbpez7KI4CCXg" } }, text: "selftest", at });
+    return json({ ok: true, queuedFor: at });
+  }
   return json({ ok: !!keys, publicKey: keys?.publicKey || null });
 }
 
