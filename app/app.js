@@ -160,11 +160,40 @@ function renderAction(a) {
         h("div", { class: "kicker" }, "Ready"),
         h("h3", {}, a.title), a.detail ? h("div", { class: "sub" }, a.detail) : null,
         h("div", { class: "links" }, (a.links || []).map((l) => h("a", { href: l.url, target: "_blank", rel: "noopener" }, l.label))));
-    case "reminder":
+    case "reminder": {
+      const on = pushOn();
+      const upcoming = new Date(a.at) > new Date();
+      const nudge = !on && pushOK && upcoming ? h("button", { class: "btn go", type: "button", onclick: async () => {
+        nudge.disabled = true; nudge.textContent = "Turning on…";
+        try { await enablePush(); nudge.className = "btn done"; nudge.textContent = "✓ I'll text you on time"; }
+        catch (e) { nudge.disabled = false; nudge.textContent = "Text me when it's time"; note.textContent = pushError(e); }
+      } }, "Text me when it's time") : null;
+      const note = h("span", { class: "note" }, on && upcoming ? "I'll text you on time, even if the app is closed." : "");
       return h("div", { class: "card" },
         h("div", { class: "kicker" }, "Reminder set"),
         h("h3", {}, a.text), h("div", { class: "sub" }, fmtTime(a.at)),
-        a.calendarUrl ? h("div", { class: "btns" }, h("a", { class: "btn soft", href: a.calendarUrl, target: "_blank", rel: "noopener" }, "Add to Google Calendar")) : null);
+        h("div", { class: "btns" }, nudge,
+          a.calendarUrl ? h("a", { class: "btn soft", href: a.calendarUrl, target: "_blank", rel: "noopener" }, "Add to Google Calendar") : null),
+        note);
+    }
+    case "push_offer": {
+      const yes = h("button", { class: "btn go", type: "button", onclick: async () => {
+        yes.disabled = true; yes.textContent = "Turning on…"; store.set("pushAsked", true);
+        try {
+          brief = { ...brief, on: true }; store.set("brief", brief);
+          await enablePush();
+          yes.className = "btn done"; yes.textContent = "✓ Done, check your notifications"; no.remove();
+        } catch (e) { brief = { ...brief, on: false }; store.set("brief", brief); yes.disabled = false; yes.textContent = "Yes, text me"; msg.textContent = pushError(e); }
+      } }, "Yes, text me");
+      const no = h("button", { class: "btn soft", type: "button", onclick: () => { store.set("pushAsked", true); card.remove(); } }, "Not now");
+      const msg = h("span", { class: "note" }, iosNeedsInstall() ? "On iPhone, first add Sherr I to your Home Screen (Share → Add to Home Screen)." : "");
+      const card = h("div", { class: "card" },
+        h("div", { class: "kicker ask" }, "Needs your tap"),
+        h("h3", {}, "Can I text you first?"),
+        h("div", { class: "sub" }, "Reminders right on time, and a short good-morning brief at 8. Even when the app is closed."),
+        h("div", { class: "btns" }, yes, no), msg);
+      return card;
+    }
     case "answer":
       return h("div", { class: "card" }, h("div", { class: "kicker" }, `${a.model} says`), h("div", { class: "answer" }, a.text));
     case "image":
@@ -189,9 +218,11 @@ function applyActions(actions) {
   for (const a of actions) {
     if (a.type === "save_contact") saveContact(a.name, a.phone);
     if (a.type === "reminder") {
-      reminders.push({ text: a.text, at: a.at, done: false });
+      const r = { id: "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text: a.text, at: a.at, done: false };
+      reminders.push(r);
       store.set("reminders", reminders);
-      if ("Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => {});
+      if (pushOn()) pushApi({ op: "remind", sub: pushState.sub, id: r.id, text: r.text, at: r.at })
+        .then(() => { r.pushed = true; store.set("reminders", reminders); }).catch(() => {});
     }
   }
 }
@@ -302,6 +333,7 @@ $("#obForm").addEventListener("submit", (e) => {
   if (inviteNeeded) { invite = $("#obInvite").value.trim().toUpperCase(); store.set("invite", invite); }
   sheet("#onboard", false);
   greet();
+  setTimeout(offerPush, 400);
 });
 
 // ------------------------------------------------------------------- start
@@ -341,6 +373,7 @@ function checkReminders() {
   for (const r of reminders) {
     if (!r.done && new Date(r.at) <= new Date()) {
       r.done = true; changed = true;
+      if (r.pushed) continue; // the notification + chat message come from Sherr I's push
       addRow("assistant", "⏰ " + r.text);
       if ("Notification" in window && Notification.permission === "granted") {
         try { new Notification("Sherr I", { body: r.text, icon: "/icons/icon-192.png" }); } catch { /* ignore */ }
@@ -351,9 +384,170 @@ function checkReminders() {
   if (changed) store.set("reminders", reminders.filter((r) => !r.done || Date.now() - new Date(r.at) < 864e5));
 }
 
+
+// ------------------------------------------------------- Sherr I texts you
+// Like a person would: reminders on time and a morning brief, as real notifications, app open or not.
+const pushOK = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const iosNeedsInstall = () => /iphone|ipad|ipod/i.test(navigator.userAgent) && !(matchMedia("(display-mode: standalone)").matches || navigator.standalone);
+let pushState = store.get("push", null); // { sub, key }
+let brief = store.get("brief", { on: false, time: "08:00", city: "" });
+const pushOn = () => !!(pushOK && pushState?.sub && Notification.permission === "granted");
+
+function keyBytes(b64) {
+  const s = b64.replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(s + "=".repeat((4 - (s.length % 4)) % 4));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+async function pushApi(body) {
+  const r = await fetch("/api/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "push_failed");
+  return j;
+}
+function pushError(e) {
+  const m = String(e?.message || e);
+  if (m === "denied") return "Notifications are blocked. Allow them for this site in your browser settings, then try again.";
+  if (m === "unsupported") return iosNeedsInstall() ? "On iPhone, add Sherr I to your Home Screen first (Share → Add to Home Screen)." : "This browser can't receive notifications. Try Chrome.";
+  if (m === "push_not_configured") return "Notifications aren't set up on the server yet.";
+  return "Couldn't turn it on. Check your internet and try again.";
+}
+async function subscribe(fresh = false) {
+  const reg = await navigator.serviceWorker.ready;
+  const { publicKey } = await fetch("/api/push").then((r) => r.json());
+  if (!publicKey) throw new Error("push_not_configured");
+  let sub = await reg.pushManager.getSubscription();
+  if (sub && (fresh || pushState?.key !== publicKey)) { await sub.unsubscribe().catch(() => {}); sub = null; }
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) });
+  pushState = { sub: sub.toJSON(), key: publicKey };
+  store.set("push", pushState);
+  return pushState.sub;
+}
+async function startBrief(sub) {
+  const res = await pushApi({ op: "brief", sub, id: "b" + Date.now().toString(36), time: brief.time, tzOffset: -new Date().getTimezoneOffset(),
+    city: brief.city, name: profile?.name, language: profile?.language });
+  if (res.city) brief.city = res.city;
+  store.set("brief", brief);
+  return res;
+}
+// Re-register everything pending on the current subscription (after turning on, or after it changed).
+async function resync(sub) {
+  for (const r of reminders) {
+    if (r.done || new Date(r.at) <= new Date()) continue;
+    if (!r.id) r.id = "r" + Math.random().toString(36).slice(2, 10);
+    try { await pushApi({ op: "remind", sub, id: r.id, text: r.text, at: r.at }); r.pushed = true; } catch { /* keeps local ring */ }
+  }
+  store.set("reminders", reminders);
+  if (brief.on) await startBrief(sub);
+}
+async function enablePush() {
+  if (!pushOK) throw new Error("unsupported");
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") throw new Error("denied");
+  const sub = await subscribe(true); // fresh, so no old schedule can double up
+  await pushApi({ op: "hello", sub, name: profile?.name });
+  await resync(sub);
+  renderTexts();
+}
+// Turning something off = a fresh subscription. Old scheduled texts then bounce and stop by themselves.
+async function rotatePush() {
+  const sub = await subscribe(true);
+  await resync(sub);
+}
+async function disablePush() {
+  const reg = await navigator.serviceWorker.ready;
+  await (await reg.pushManager.getSubscription())?.unsubscribe().catch(() => {});
+  pushState = null; store.set("push", null);
+  for (const r of reminders) r.pushed = false;
+  store.set("reminders", reminders);
+}
+
+function renderTexts() {
+  const box = $("#textsYou"); if (!box) return;
+  const status = h("small", { class: "note" });
+  const mkSwitch = (checked, label, onchange) => {
+    const cb = h("input", { type: "checkbox", "aria-label": label }); cb.checked = checked;
+    cb.addEventListener("change", async () => {
+      cb.disabled = true; status.textContent = "";
+      try { await onchange(cb.checked); } catch (e) { cb.checked = !cb.checked; status.textContent = pushError(e); }
+      cb.disabled = false; renderTexts();
+    });
+    return h("label", { class: "switch" }, cb, h("span"));
+  };
+  const on = pushOn();
+  const notif = h("div", { class: "power" }, doodle("chat"),
+    h("div", { class: "txt" }, h("b", {}, "Texts you first"), h("small", {}, "Reminders right on time, even when the app is closed.")),
+    pushOK ? mkSwitch(on, "Texts you first", async (v) => { if (v) await enablePush(); else { brief = { ...brief, on: false }; store.set("brief", brief); await disablePush(); } }) : null);
+  const time = h("input", { type: "time", value: brief.time, "aria-label": "Brief time", class: "mini" });
+  const city = h("input", { type: "text", value: brief.city || "", placeholder: "Your city, for weather", "aria-label": "City", class: "mini wide" });
+  const saveBrief = async () => {
+    const t = time.value || "08:00", c = city.value.trim();
+    if (t === brief.time && c === (brief.city || "")) return;
+    brief = { ...brief, time: t, city: c }; store.set("brief", brief);
+    if (brief.on && pushOn()) { status.textContent = "Saving…"; try { await rotatePush(); status.textContent = `✓ Next brief at ${t}${brief.city ? " · " + brief.city : ""}`; } catch (e) { status.textContent = pushError(e); } }
+  };
+  time.addEventListener("change", saveBrief); city.addEventListener("change", saveBrief);
+  const briefRow = h("div", { class: "power" }, doodle("spark"),
+    h("div", { class: "txt" }, h("b", {}, "Morning brief"), h("small", {}, "Day, weather and a nudge to plan, every morning."),
+      brief.on ? h("div", { class: "mini-row" }, time, city) : null),
+    pushOK ? mkSwitch(brief.on && on, "Morning brief", async (v) => {
+      brief = { ...brief, on: v }; store.set("brief", brief);
+      if (v) { if (!pushOn()) await enablePush(); else await startBrief(pushState.sub); }
+      else if (pushOn()) await rotatePush();
+    }) : null);
+  const hint = !pushOK || iosNeedsInstall() ? h("small", { class: "note" }, pushError(new Error("unsupported")))
+    : Notification.permission === "denied" ? h("small", { class: "note" }, pushError(new Error("denied"))) : null;
+  box.replaceChildren(h("h4", {}, "Sherr I texts you"), notif, briefRow, hint, status);
+}
+
+// Texts that arrived while the app was closed show up in the chat, like messages from a person.
+let readingInbox = false;
+async function readInbox() {
+  if (readingInbox || !("caches" in window)) return;
+  readingInbox = true;
+  try {
+    const c = await caches.open("sherr-inbox");
+    const keys = (await c.keys()).sort((a, b) => a.url.localeCompare(b.url));
+    let added = false;
+    for (const req of keys) {
+      const m = await (await c.match(req))?.json().catch(() => null);
+      await c.delete(req);
+      if (!m) continue;
+      if (m.type === "resubscribe") { if (pushState) rotatePush().catch(() => {}); continue; }
+      if (m.type === "hello" || !m.text) continue;
+      const text = m.type === "remind" ? "⏰ " + m.text : m.text;
+      const last = history[history.length - 1];
+      if (last?.role === "assistant" && last.content === text) continue; // same text delivered twice
+      if (m.type === "remind") reminders.forEach((r) => { if (r.id === m.id) r.done = true; });
+      history.push({ role: "assistant", content: text });
+      addRow("assistant", text);
+      added = true;
+    }
+    if (added) { store.set("history", history.slice(-80)); store.set("reminders", reminders); }
+  } catch { /* inbox is best-effort */ } finally { readingInbox = false; }
+}
+navigator.serviceWorker?.addEventListener("message", (e) => { if (e.data?.sherr === "inbox") readInbox(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") readInbox(); });
+
+// Keep the subscription healthy: if the server key changed, quietly move everything to a new one.
+async function checkPush() {
+  if (!pushOn()) return;
+  try {
+    const { publicKey } = await fetch("/api/push").then((r) => r.json());
+    if (publicKey && publicKey !== pushState.key) await rotatePush();
+  } catch { /* offline */ }
+}
+function offerPush() {
+  if (!pushOK || pushOn() || store.get("pushAsked", false) || !profile) return;
+  if (Notification.permission === "denied") return;
+  feed.append(h("div", { class: "cards" }, renderAction({ type: "push_offer" })));
+  scrollDown();
+}
+
 renderPowers();
+renderTexts();
 for (const m of history) addRow(m.role, m.content, m.actions || []);
 greet();
 setInterval(checkReminders, 20_000); checkReminders();
 fetch("/api/chat").then((r) => r.json()).then((s) => { inviteNeeded = !!s.invite && !invite; if (!profile) setTimeout(openOnboard, history.length ? 0 : 3200); }).catch(() => { if (!profile) setTimeout(openOnboard, 3200); });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").then(() => { readInbox(); checkPush(); }).catch(() => {});
+setTimeout(offerPush, history.length ? 600 : 3600);

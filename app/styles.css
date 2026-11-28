@@ -145,3 +145,10 @@ button{cursor:pointer}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition:none!important}
 }
+
+/* Sherr I texts you */
+.mini-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.mini{background:var(--soft);border:1px solid transparent;border-radius:10px;padding:7px 10px;color:var(--ink);font:inherit;font-size:14px;min-width:0}
+.mini.wide{flex:1;min-width:140px}
+.mini:focus{outline:none;border-color:var(--line)}
+#textsYou .note{display:block;margin-top:8px}
